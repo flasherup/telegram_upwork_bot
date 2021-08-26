@@ -1,0 +1,6 @@
+.idea/
+telegrum_upwork_bot.iml
+cmd/config.yml
+build/config.yml
+build/telegramupworkbot
+cmd/responseexample.xml
