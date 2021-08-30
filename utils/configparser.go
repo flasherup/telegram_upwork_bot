@@ -13,9 +13,27 @@ type UpworkCfg struct {
 	Feeds         []string `yaml:"feeds"`
 }
 
+type User struct {
+	Id int64 `yaml:"id"`
+	ZoneName string `yaml:"zone_name"`
+	ZoneOffset int `yaml:"zone_offset"`
+}
+
+type Telegram struct {
+	Token string  `yaml:"token"`
+	Users []User `yaml:"users"`
+}
+
+type Filters struct {
+	SkipDuration int   `yaml:"skip_duration"`
+	Skills       []string `yaml:"skills"`
+	Countries    []string `yaml:"countries"`
+}
+
 type UpworkBotConfig struct {
-	Token  string    `yaml:"token"`
-	Upwork UpworkCfg `yaml:"upwork"`
+	Telegram Telegram  `yaml:"telegram"`
+	Upwork   UpworkCfg `yaml:"upwork"`
+	Filters  Filters   `yaml:"filters"`
 }
 
 func LoadConfig(path string) (config *UpworkBotConfig, err error) {

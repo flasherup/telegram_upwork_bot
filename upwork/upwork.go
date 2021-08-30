@@ -20,22 +20,26 @@ func NewUpwork(config utils.UpworkCfg) *Upwork {
 }
 
 type RSSResponse struct {
-	Feed *UWFeed
+	Feed *Feed
 	Error error
 }
 
 func (up Upwork)Run(period time.Duration) chan *RSSResponse {
 	ch := make(chan *RSSResponse)
 	go func() {
-		feeds := up.config.Feeds
+		up.UpdateFeeds(ch)// Immediately
 		for {
 			time.Sleep(period)
-			for _, v := range feeds {
-				up.FetchRss(v, ch)
-			}
+			up.UpdateFeeds(ch)
 		}
 	}()
 	return ch
+}
+
+func (up Upwork) UpdateFeeds(ch chan *RSSResponse)  {
+	for _, v := range up.config.Feeds {
+		up.FetchRss(v, ch)
+	}
 }
 
 func (up Upwork)FetchRss(topic string, ch chan *RSSResponse) {
@@ -70,5 +74,6 @@ func (up Upwork)FetchRss(topic string, ch chan *RSSResponse) {
 
 	rss := UWFeed{}
 	xml.Unmarshal(content, &rss)
-	ch <- &RSSResponse{ &rss, err }
+	res, err := ConvertUWFeedToFeed(&rss)
+	ch <- &RSSResponse{ res, err }
 }

@@ -23,7 +23,7 @@ func main() {
 	uw := upwork.NewUpwork(config.Upwork)
 	ch := uw.Run(time.Second *15)
 
-	bot, err := tgbotapi.NewBotAPI(config.Token)
+	bot, err := tgbotapi.NewBotAPI(config.Telegram.Token)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -33,13 +33,13 @@ func main() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
-	chatIds := []int64{388017091}
+	users := config.Telegram.Users
 
 	updates, err := bot.GetUpdatesChan(u)
 	for {
 		select {
 		case resp := <-ch:
-			if len(chatIds) == 0 {
+			if len(users) == 0 {
 				continue
 			}
 			if resp.Error == nil {
@@ -49,11 +49,11 @@ func main() {
 					processors[resp.Feed.Id] = p
 				}
 
-				entries := p.Check(resp.Feed.Entries)
+				entries := p.Check(resp.Feed.Entries, config.Filters.SkipDuration)
 				for _,v := range entries {
-					msg := upworkEntryToBotMessage(&v, 0)
-					for _,chatId := range chatIds {
-						msg.ChatID =chatId
+					for _,user := range users {
+						msg := upworkEntryToBotMessage(&v, user)
+						msg.ChatID = user.Id
 						bot.Send(msg)
 					}
 				}
@@ -64,46 +64,50 @@ func main() {
 				continue
 			}
 			chatId := update.Message.Chat.ID
-			if !isIdExist(chatIds, chatId) {
-				chatIds = append(chatIds,chatId)
+			if !isIdExist(users, chatId) {
+				t := time.Unix(int64(update.Message.Date), 0)
+				zone, offset := t.Zone()
+				user := utils.User{
+					Id: chatId,
+					ZoneName:zone,
+					ZoneOffset:offset,
+				}
+				users = append(users,user)
 			}
+
+
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
 			msg.ReplyToMessageID = update.Message.MessageID
-			fmt.Println("chatId", chatId)
 			bot.Send(msg)
 		}
 	}
 }
 
-func upworkEntryToBotMessage(entry *upwork.UWEntry, chatId int64) tgbotapi.MessageConfig {
-	summary := upwork.ParseSummary(entry.Summary)
+func upworkEntryToBotMessage(entry *upwork.Entry, user utils.User) tgbotapi.MessageConfig {
 	text := fmt.Sprintf("*%s*\n", entry.Title)
-	update, err := time.Parse("2006-01-02T15:04:05+00:00", entry.Updated)
-	if err != nil {
-		fmt.Println("Time parse Error")
-	} else {
-		text += fmt.Sprintf("\n_%s_\n\n", update.Format("Mon Jan 2 15:04:05"))
-	}
-	text += summary.Text + "\n"
+	loc := time.FixedZone(user.ZoneName, user.ZoneOffset)
+	local := entry.Updated.In(loc)
+	text += fmt.Sprintf("\n_%s_\n\n", local.Format("Mon Jan 2 15:04:05"))
+	text += entry.Summary.Text + "\n"
 	text += "\n"
-	text += fmt.Sprintf("*Posteg on*: %s\n", summary.PostedOn)
-	text += fmt.Sprintf("*Category*: %s\n", summary.Category)
-	text += fmt.Sprintf("*Country*: %s\n", summary.Country)
-	if summary.Budget > 0 {
-		text += fmt.Sprintf("*Budget*: $%d\n", summary.Budget)
+	text += fmt.Sprintf("*Posteg on*: %s\n", entry.Summary.PostedOn)
+	text += fmt.Sprintf("*Category*: %s\n", entry.Summary.Category)
+	text += fmt.Sprintf("*Country*: %s\n", entry.Summary.Country)
+	if entry.Summary.Budget > 0 {
+		text += fmt.Sprintf("*Budget*: $%d\n", entry.Summary.Budget)
 	}
-	if len(summary.HourlyRange) > 0 {
-		text += fmt.Sprintf("*Hourly Range*: $%g-$%g\n", summary.HourlyRange[0], summary.HourlyRange[1])
+	if len(entry.Summary.HourlyRange) > 0 {
+		text += fmt.Sprintf("*Hourly Range*: $%g-$%g\n", entry.Summary.HourlyRange[0], entry.Summary.HourlyRange[1])
 	}
-	text += fmt.Sprintf("[More info...](%s)\n", summary.Link)
-	msg := tgbotapi.NewMessage(chatId, text)
+	text += fmt.Sprintf("[More info...](%s)\n", entry.Summary.Link)
+	msg := tgbotapi.NewMessage(user.Id, text)
 	msg.ParseMode = "Markdown"
 	return msg
 }
 
-func isIdExist(ids []int64, id int64) bool {
-	for _,v := range ids {
-		if v == id {
+func isIdExist(users []utils.User, id int64) bool {
+	for _,user := range users {
+		if user.Id == id {
 			return true
 		}
 	}

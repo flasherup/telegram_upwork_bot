@@ -1,11 +1,25 @@
 package upwork
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
+
+type Feed struct {
+	Id string
+	Entries []Entry
+}
+
+type Entry struct {
+	Id      string
+	Title   string
+	Updated time.Time
+	Link    string
+	Summary Summary
+	Content string
+}
 
 type Summary struct {
 	Text string
@@ -16,6 +30,44 @@ type Summary struct {
 	Link string
 	Budget int
 	HourlyRange []float64
+}
+
+func ConvertUWFeedToFeed(uwFeed * UWFeed) (*Feed, error) {
+	res := Feed{
+		Id:uwFeed.Id,
+		Entries: make([]Entry, 0),
+	}
+
+	for _,entry := range uwFeed.Entries {
+		e, err := ConvertUWEntryToEntry(&entry)
+		if err != nil {
+			return &res, err
+		}
+
+		res.Entries = append(res.Entries, *e)
+	}
+
+	return &res, nil
+}
+
+
+func ConvertUWEntryToEntry(uwEntry * UWEntry) (*Entry, error) {
+	res := Entry{
+		Id: uwEntry.Id,
+		Title: uwEntry.Updated,
+		Link: uwEntry.Link.Href,
+		Content: uwEntry.Content,
+	}
+
+	res.Summary = ParseSummary(uwEntry.Summary)
+
+	uTime, err := time.Parse("2006-01-02T15:04:05-07:00", uwEntry.Updated)
+	if err != nil {
+		return &res, err
+	}
+	res.Updated = uTime
+
+	return &res, nil
 }
 
 func ParseSummary(summary string) Summary {
@@ -57,8 +109,6 @@ func ParseSummary(summary string) Summary {
 	res.Budget = parseBudget(budget)
 	hourly := getSummaryItem(rest, hourlyRangeR, brR)
 	res.HourlyRange = parseHourlyRange(hourly)
-
-	fmt.Println(descEndIndex)
 	return res
 }
 
