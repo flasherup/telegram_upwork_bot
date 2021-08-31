@@ -54,7 +54,7 @@ func ConvertUWFeedToFeed(uwFeed * UWFeed) (*Feed, error) {
 func ConvertUWEntryToEntry(uwEntry * UWEntry) (*Entry, error) {
 	res := Entry{
 		Id: uwEntry.Id,
-		Title: uwEntry.Updated,
+		Title: uwEntry.Title,
 		Link: uwEntry.Link.Href,
 		Content: uwEntry.Content,
 	}
